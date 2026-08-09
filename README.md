@@ -1,97 +1,81 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# Image to PDF Converter — Setup Guide (Android only)
 
-# Getting Started
+## 1. Install dependencies
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+```bash
+npx react-native init ImagePdfConverter
+cd ImagePdfConverter
 
-## Step 1: Start Metro
-
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
-
-To start the Metro dev server, run the following command from the root of your React Native project:
-
-```sh
-# Using npm
-npm start
-
-# OR using Yarn
-yarn start
+npm install react-native-image-crop-picker
+npm install @dr.pogodin/react-native-fs
+npm install react-native-html-to-pdf
+npm install react-native-permissions
 ```
 
-## Step 2: Build and run your app
+Then copy `App.js`, `src/screens/HomeScreen.js`, and `src/utils/pdfHelper.js`
+from this project into your generated project (overwrite the default `App.js`).
 
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
+## 2. Android permissions
 
-### Android
+Open `android/app/src/main/AndroidManifest.xml` and add, just above `<application>`:
 
-```sh
-# Using npm
-npm run android
-
-# OR using Yarn
-yarn android
+```xml
+<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+<uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
 ```
 
-### iOS
+`READ_MEDIA_IMAGES` is required for Android 13+ (API 33+); `READ_EXTERNAL_STORAGE`
+covers older versions. The app requests these at runtime in `HomeScreen.js`.
 
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
+## 3. react-native-image-crop-picker native setup
 
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
+This library needs a small manifest addition. In the same
+`AndroidManifest.xml`, ensure `android:requestLegacyExternalStorage="true"`
+is NOT required (it isn't for this library on modern RN versions), but do add
+this line inside `<application>` if you hit a "provider" conflict on build:
 
-```sh
-bundle install
+```xml
+<provider
+  android:name="com.reactnativecommunity.imagepicker.ImagePickerFileProvider"
+  ... />
 ```
 
-Then, and every time you update your native dependencies, run:
+(Only add this if the build error explicitly asks for it — most current
+versions of the library auto-merge this via their own manifest.)
 
-```sh
-bundle exec pod install
+## 4. Rebuild native code after installing
+
+Every time you install a library with native code (all three above have
+native Android code), run:
+
+```bash
+cd android && ./gradlew clean && cd ..
+npx react-native run-android
 ```
 
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
+## 5. How the flow works
 
-```sh
-# Using npm
-npm run ios
+1. **Pick** — `HomeScreen.js` calls `ImagePicker.openPicker({ multiple: true })`
+   from `react-native-image-crop-picker`. Returns an array of local image paths.
+2. **Preview** — Selected images show as a horizontal thumbnail strip. Tap the
+   red × to remove one before converting.
+3. **Convert** — `pdfHelper.js` reads each image as base64 (`@dr.pogodin/react-native-fs`),
+   builds one HTML page per image, and calls `react-native-html-to-pdf` to
+   render it into a real PDF file saved under the app's Documents directory.
+4. **Share** — Uses React Native's **built-in** `Share` API (no extra library
+   needed) to open the Android share sheet — WhatsApp, Gmail, Drive, etc.
 
-# OR using Yarn
-yarn ios
-```
+## 6. Next features to add (v2, after publishing v1)
 
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
+- Reorder images via drag-and-drop before converting (e.g. `react-native-draggable-flatlist`)
+- Compress PDF quality option (adjust `compressImageQuality` in the picker)
+- AdMob banner + interstitial ad after successful conversion
+- PDF-to-Image (separate feature, needs native `PdfRenderer` — build after v1 has users)
 
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
+## 7. Testing checklist before Play Store upload
 
-## Step 3: Modify your app
-
-Now that you have successfully run the app, let's make changes!
-
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
-
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
-
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
-
-## Congratulations! :tada:
-
-You've successfully run and modified your React Native App. :partying_face:
-
-### Now what?
-
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
-
-# Troubleshooting
-
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
-
-# Learn More
-
-To learn more about React Native, take a look at the following resources:
-
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+- [ ] Test with 1 image, 5 images, and 20+ images (large PDF performance)
+- [ ] Test on a real device with Android 13+ (permission flow differs from older)
+- [ ] Test share sheet opens correctly and PDF opens in a PDF viewer
+- [ ] Test app doesn't crash if user cancels image picker
+- [ ] Generate release APK/AAB with signed keystore before uploading

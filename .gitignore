@@ -25,6 +25,10 @@ DerivedData
 # Android/IntelliJ
 #
 build/
+android/app/release/
+*.apk
+*.aab
+*.dm
 .idea
 .gradle
 local.properties
