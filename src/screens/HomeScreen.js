@@ -24,6 +24,7 @@ import ImagePicker from 'react-native-image-crop-picker';
 import VersionCheck from 'react-native-version-check';
 import RNShare from 'react-native-share';
 import FileViewer from 'react-native-file-viewer';
+import DocumentScanner from 'react-native-document-scanner-plugin';
 import { convertImagesToPDF } from '../utils/pdfHelper';
 import ImageEditorScreen from './ImageEditorScreen';
 import { DocumentDirectoryPath, exists as fsExists, readFile, writeFile, unlink } from '@dr.pogodin/react-native-fs';
@@ -37,6 +38,7 @@ export default function HomeScreen() {
     const [loading, setLoading] = useState(false);
     const [pdfPath, setPdfPath] = useState(null);
     const [showNameModal, setShowNameModal] = useState(false);
+    const [showSourceModal, setShowSourceModal] = useState(false);
     const [pdfFileName, setPdfFileName] = useState('');
     const fadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -148,7 +150,7 @@ export default function HomeScreen() {
             Alert.alert('Permission needed', 'Storage access is required to pick images.');
             return;
         }
-        
+
         if (images.length >= 30) {
             Alert.alert('Limit Reached', 'You can only select up to 30 images maximum.');
             return;
@@ -164,9 +166,9 @@ export default function HomeScreen() {
                 compressImageMaxWidth: 1600,
                 compressImageMaxHeight: 1600,
             });
-            
+
             const formatted = picked.map((img) => ({ path: img.path }));
-            
+
             setImages((prev) => {
                 const combined = [...prev, ...formatted];
                 if (combined.length > 30) {
@@ -183,6 +185,35 @@ export default function HomeScreen() {
             }
         }
     };
+
+    const scanDocument = async () => {
+        if (images.length >= 30) {
+            Alert.alert('Limit Reached', 'You can only add up to 30 images maximum.');
+            return;
+        }
+
+        try {
+            const { scannedImages } = await DocumentScanner.scanDocument({
+                maxNumDocuments: 30 - images.length,
+            });
+            if (scannedImages && scannedImages.length > 0) {
+                const formatted = scannedImages.map((imgPath) => ({ path: imgPath }));
+                setImages((prev) => {
+                    const combined = [...prev, ...formatted];
+                    if (combined.length > 30) {
+                        Alert.alert('Limit Reached', 'You can only add up to 30 images. Extra images were ignored.');
+                        return combined.slice(0, 30);
+                    }
+                    return combined;
+                });
+                setPdfPath(null);
+            }
+        } catch (error) {
+            console.error('Scan Error:', error);
+            Alert.alert('Error', 'Could not scan document.');
+        }
+    };
+
 
     const removeImage = (index) => {
         setImages((prev) => prev.filter((_, i) => i !== index));
@@ -549,7 +580,7 @@ export default function HomeScreen() {
 
             {/* ── Bottom Action Bar ── */}
             <View style={styles.bottomBar}>
-                <TouchableOpacity style={styles.addButton} onPress={pickImages} activeOpacity={0.8}>
+                <TouchableOpacity style={styles.addButton} onPress={() => setShowSourceModal(true)} activeOpacity={0.8}>
                     <Text style={styles.addButtonIcon}>＋</Text>
                     <Text style={styles.addButtonText}>Add Images</Text>
                 </TouchableOpacity>
@@ -573,6 +604,65 @@ export default function HomeScreen() {
                 )}
             </View>
 
+            {/* ── Image Source Selection Modal ── */}
+            <Modal
+                visible={showSourceModal}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setShowSourceModal(false)}
+            >
+                <TouchableOpacity
+                    style={styles.aboutOverlay}
+                    activeOpacity={1}
+                    onPress={() => setShowSourceModal(false)}
+                >
+                    <TouchableOpacity activeOpacity={1} style={styles.aboutBox}>
+                        <View style={styles.aboutHandle} />
+                        <Text style={[styles.modalTitle, { marginBottom: 20 }]}>Add Image</Text>
+
+                        <TouchableOpacity
+                            style={styles.sourceOptionBtn}
+                            onPress={() => {
+                                setShowSourceModal(false);
+                                setTimeout(() => scanDocument(), 300);
+                            }}
+                        >
+                            <View style={styles.sourceOptionIconWrap}>
+                                <Text style={styles.sourceOptionIconEmoji}>📸</Text>
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.sourceOptionTitle}>Camera</Text>
+                                <Text style={styles.sourceOptionSubtitle}>Scan documents with auto-crop</Text>
+                            </View>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={[styles.sourceOptionBtn, { marginBottom: 24 }]}
+                            onPress={() => {
+                                setShowSourceModal(false);
+                                setTimeout(() => pickImages(), 300);
+                            }}
+                        >
+                            <View style={[styles.sourceOptionIconWrap, { backgroundColor: 'rgba(16, 185, 129, 0.12)', borderColor: 'rgba(16, 185, 129, 0.2)' }]}>
+                                <Text style={styles.sourceOptionIconEmoji}>🖼️</Text>
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.sourceOptionTitle}>Photo Library</Text>
+                                <Text style={styles.sourceOptionSubtitle}>Pick photos from your gallery</Text>
+                            </View>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={styles.aboutCloseBtn}
+                            onPress={() => setShowSourceModal(false)}
+                            activeOpacity={0.8}
+                        >
+                            <Text style={styles.aboutCloseBtnText}>Cancel</Text>
+                        </TouchableOpacity>
+                    </TouchableOpacity>
+                </TouchableOpacity>
+            </Modal>
+
             {/* ── File-name prompt modal ── */}
             <Modal
                 visible={showNameModal}
@@ -580,7 +670,7 @@ export default function HomeScreen() {
                 animationType="fade"
                 onRequestClose={() => setShowNameModal(false)}
             >
-                <KeyboardAvoidingView 
+                <KeyboardAvoidingView
                     style={{ flex: 1 }}
                     behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
                 >
@@ -1265,6 +1355,42 @@ const styles = StyleSheet.create({
         fontWeight: '700',
     },
 
+    /* Image Source Modal */
+    sourceOptionBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(15,23,42,0.6)',
+        padding: 16,
+        borderRadius: 16,
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.06)',
+    },
+    sourceOptionIconWrap: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        backgroundColor: 'rgba(59,130,246,0.12)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 16,
+        borderWidth: 1,
+        borderColor: 'rgba(59,130,246,0.2)',
+    },
+    sourceOptionIconEmoji: {
+        fontSize: 22,
+    },
+    sourceOptionTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#F1F5F9',
+        marginBottom: 2,
+    },
+    sourceOptionSubtitle: {
+        fontSize: 13,
+        color: '#64748B',
+    },
+
     /* Info Button */
     infoButton: {
         width: 38,
@@ -1292,7 +1418,7 @@ const styles = StyleSheet.create({
         borderTopLeftRadius: 28,
         borderTopRightRadius: 28,
         padding: 24,
-        paddingBottom: Platform.OS === 'ios' ? 40 : 28,
+        paddingBottom: Platform.OS === 'ios' ? 40 : 56,
         borderWidth: 1,
         borderBottomWidth: 0,
         borderColor: 'rgba(255,255,255,0.08)',
