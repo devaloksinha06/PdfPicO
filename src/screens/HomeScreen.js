@@ -129,6 +129,27 @@ export default function HomeScreen() {
         }
     };
 
+    const requestCameraPermission = async () => {
+        if (Platform.OS !== 'android') return true;
+        try {
+            const granted = await PermissionsAndroid.request(
+                PermissionsAndroid.PERMISSIONS.CAMERA,
+                {
+                    title: 'Camera Permission',
+                    message: 'App needs camera access to take photos.',
+                    buttonNeutral: 'Ask Me Later',
+                    buttonNegative: 'Cancel',
+                    buttonPositive: 'OK',
+                }
+            );
+            return granted === PermissionsAndroid.RESULTS.GRANTED;
+        } catch (err) {
+            console.warn(err);
+            return false;
+        }
+    };
+
+
     const requestWritePermission = async () => {
         if (Platform.OS !== 'android') return true;
         if (Platform.Version >= 29) return true;
@@ -211,6 +232,47 @@ export default function HomeScreen() {
         } catch (error) {
             console.error('Scan Error:', error);
             Alert.alert('Error', 'Could not scan document.');
+        }
+    };
+
+    const openStandardCamera = async () => {
+        const hasCameraPermission = await requestCameraPermission();
+        if (!hasCameraPermission) {
+            Alert.alert('Permission needed', 'Camera access is required to take photos.');
+            return;
+        }
+
+        if (images.length >= 30) {
+            Alert.alert('Limit Reached', 'You can only add up to 30 images maximum.');
+            return;
+        }
+
+        try {
+            const image = await ImagePicker.openCamera({
+                mediaType: 'photo',
+                cropping: true,
+                freeStyleCropEnabled: true,
+                compressImageQuality: 0.6,
+                compressImageMaxWidth: 1600,
+                compressImageMaxHeight: 1600,
+            });
+            
+            const formatted = { path: image.path };
+            
+            setImages((prev) => {
+                const combined = [...prev, formatted];
+                if (combined.length > 30) {
+                    Alert.alert('Limit Reached', 'You can only add up to 30 images.');
+                    return combined.slice(0, 30);
+                }
+                return combined;
+            });
+            setPdfPath(null);
+        } catch (err) {
+            if (err.code !== 'E_PICKER_CANCELLED') {
+                console.error(err);
+                Alert.alert('Error', 'Could not open camera.');
+            }
         }
     };
 
@@ -628,11 +690,27 @@ export default function HomeScreen() {
                             }}
                         >
                             <View style={styles.sourceOptionIconWrap}>
+                                <Text style={styles.sourceOptionIconEmoji}>📄</Text>
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.sourceOptionTitle}>Smart Scan</Text>
+                                <Text style={styles.sourceOptionSubtitle}>Auto-crop with ML (Enhances text)</Text>
+                            </View>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={styles.sourceOptionBtn}
+                            onPress={() => {
+                                setShowSourceModal(false);
+                                setTimeout(() => openStandardCamera(), 300);
+                            }}
+                        >
+                            <View style={[styles.sourceOptionIconWrap, { backgroundColor: 'rgba(245, 158, 11, 0.12)', borderColor: 'rgba(245, 158, 11, 0.2)' }]}>
                                 <Text style={styles.sourceOptionIconEmoji}>📸</Text>
                             </View>
                             <View style={{ flex: 1 }}>
-                                <Text style={styles.sourceOptionTitle}>Camera</Text>
-                                <Text style={styles.sourceOptionSubtitle}>Scan documents with auto-crop</Text>
+                                <Text style={styles.sourceOptionTitle}>Standard Camera</Text>
+                                <Text style={styles.sourceOptionSubtitle}>Keeps exact colors (Manual crop)</Text>
                             </View>
                         </TouchableOpacity>
 
