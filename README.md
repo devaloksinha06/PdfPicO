@@ -21,11 +21,9 @@ Open `android/app/src/main/AndroidManifest.xml` and add, just above `<applicatio
 
 ```xml
 <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
-<uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
 ```
 
-`READ_MEDIA_IMAGES` is required for Android 13+ (API 33+); `READ_EXTERNAL_STORAGE`
-covers older versions. The app requests these at runtime in `HomeScreen.js`.
+`READ_EXTERNAL_STORAGE` is requested for older Android versions (pre-Android 13). The app requests this at runtime in `HomeScreen.js`. On Android 13+, no explicit storage permissions are required since it uses the system Photo Picker.
 
 ## 3. react-native-image-crop-picker native setup
 

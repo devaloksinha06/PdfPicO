@@ -116,12 +116,11 @@ export default function HomeScreen() {
     // ─── Permissions ───────────────────────────────────────────────
     const requestStoragePermission = async () => {
         if (Platform.OS !== 'android') return true;
+        if (Platform.Version >= 33) return true;
         try {
-            const permission =
-                Platform.Version >= 33
-                    ? PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES
-                    : PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE;
-            const granted = await PermissionsAndroid.request(permission);
+            const granted = await PermissionsAndroid.request(
+                PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE
+            );
             return granted === PermissionsAndroid.RESULTS.GRANTED;
         } catch (err) {
             console.warn(err);

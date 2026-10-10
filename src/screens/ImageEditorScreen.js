@@ -136,10 +136,9 @@ export default function ImageEditorScreen({ imagePath, onSave, onCancel }) {
         try {
             const result = await ImagePicker.openCropper({
                 path: currentPath,
-                width: 1200,
-                height: 1200,
                 freeStyleCropEnabled: true,
                 cropperToolbarTitle: 'Crop Image',
+                compressImageQuality: 1,
             });
             setCurrentPath(result.path);
         } catch (err) {
